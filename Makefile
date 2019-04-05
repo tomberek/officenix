@@ -71,4 +71,8 @@ help:
 	@echo ""
 	@exec nix-shell -p nixopsUnstable3 --run "nixops --help"
 
+osx:
+	[ -x "`which nix 2>/dev/null`" ] && source <(curl -fsSL https://nixos.org/nix/install)
+	source <(curl -fsSL https://raw.githubusercontent.com/LnL7/nix-docker/master/start-docker-nix-build-slave)
+
 .PRECIOUS : ${DEPLOYMENT}/state.nixops

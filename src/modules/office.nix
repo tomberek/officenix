@@ -53,13 +53,19 @@
   };
 
   docker-containers.office = with config.common.instances; {
-    image = "onlyoffice/documentserver";
+    image = "onlyoffice/documentserver:latest";
     ports = ["8181:80"];
     extraDockerOptions= [
       "--add-host=${ace.hostname}:${office.wg}"
       "--add-host=${office.hostname}:127.0.0.1"
     ];
   };
+  security.pam.loginLimits = [{
+    domain = "*";
+    type = "soft";
+    item = "nofile";
+    value = "65536";
+  }];
 
   environment.systemPackages = with pkgs; [
     patchelfUnstable

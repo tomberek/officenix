@@ -1,0 +1,113 @@
+From 0137c7debe35e3f526f5f89e37d755cee4e78e9a Mon Sep 17 00:00:00 2001
+From: Tom Bereknyei <tom@dds.mil>
+Date: Tue, 2 Apr 2019 23:34:43 -0400
+Subject: [PATCH] Test CBA
+
+---
+ api4/user.go    |  5 +----
+ app/login.go    | 23 ++++++++++++++++++-----
+ utils/config.go |  4 ++--
+ 3 files changed, 21 insertions(+), 11 deletions(-)
+
+diff --git a/api4/user.go b/api4/user.go
+index 4107ac903..6d37f0012 100644
+--- a/api4/user.go
++++ b/api4/user.go
+@@ -49,6 +49,7 @@ func (api *API) InitUser() {
+ 	api.BaseRoutes.User.Handle("/mfa", api.ApiSessionRequiredMfa(updateUserMfa)).Methods("PUT")
+ 	api.BaseRoutes.User.Handle("/mfa/generate", api.ApiSessionRequiredMfa(generateMfaSecret)).Methods("POST")
+ 
++	api.BaseRoutes.Users.Handle("/login", api.ApiHandler(login)).Methods("GET")
+ 	api.BaseRoutes.Users.Handle("/login", api.ApiHandler(login)).Methods("POST")
+ 	api.BaseRoutes.Users.Handle("/login/switch", api.ApiHandler(switchAccountType)).Methods("POST")
+ 	api.BaseRoutes.Users.Handle("/logout", api.ApiHandler(logout)).Methods("POST")
+@@ -1127,10 +1128,6 @@ func login(c *Context, w http.ResponseWriter, r *http.Request) {
+ 	ldapOnly := props["ldap_only"] == "true"
+ 
+ 	if *c.App.Config().ExperimentalSettings.ClientSideCertEnable {
+-		if license := c.App.License(); license == nil || !*license.Features.SAML {
+-			c.Err = model.NewAppError("ClientSideCertNotAllowed", "api.user.login.client_side_cert.license.app_error", nil, "", http.StatusBadRequest)
+-			return
+-		}
+ 		certPem, certSubject, certEmail := c.App.CheckForClientSideCert(r)
+ 		mlog.Debug("Client Cert", mlog.String("cert_subject", certSubject), mlog.String("cert_email", certEmail))
+ 
+diff --git a/app/login.go b/app/login.go
+index f25c7a64b..92de76349 100644
+--- a/app/login.go
++++ b/app/login.go
+@@ -4,31 +4,44 @@
+ package app
+ 
+ import (
+-	"fmt"
++    "fmt"
+ 	"net/http"
++    "net/url"
+ 	"strings"
+ 	"time"
+ 
+ 	"github.com/avct/uasurfer"
++	"github.com/mattermost/mattermost-server/mlog"
+ 	"github.com/mattermost/mattermost-server/model"
+ 	"github.com/mattermost/mattermost-server/plugin"
+ 	"github.com/mattermost/mattermost-server/store"
+ )
+ 
+ func (a *App) CheckForClientSideCert(r *http.Request) (string, string, string) {
+-	pem := r.Header.Get("X-SSL-Client-Cert")                // mapped to $ssl_client_cert from nginx
+-	subject := r.Header.Get("X-SSL-Client-Cert-Subject-DN") // mapped to $ssl_client_s_dn from nginx
++	pemEnc := r.Header.Get("X-Forwarded-Tls-Client-Cert")                // mapped to $ssl_client_cert from nginx
++    pem, err := url.QueryUnescape(pemEnc)
++    mlog.Error(pem)
++    if err != nil {
++        return "crtFail","",""
++    }
++	subjectEnc := r.Header.Get("X-Forwarded-Tls-Client-Cert-Infos") // mapped to $ssl_client_s_dn from nginx
++    subject, err := url.QueryUnescape(subjectEnc)
++    mlog.Error(subject)
++    if err != nil {
++        return pem,"subjectFail",""
++    }
+ 	email := ""
+ 
+ 	if len(subject) > 0 {
+-		for _, v := range strings.Split(subject, "/") {
++		for _, v := range strings.Split(subject, ",") {
+ 			kv := strings.Split(v, "=")
+-			if len(kv) == 2 && kv[0] == "emailAddress" {
++			if len(kv) == 2 && kv[0] == "SAN" {
+ 				email = kv[1]
+ 			}
+ 		}
+ 	}
+ 
++    mlog.Error(email)
+ 	return pem, subject, email
+ }
+ 
+diff --git a/utils/config.go b/utils/config.go
+index 2c930c4d3..cf2a78659 100644
+--- a/utils/config.go
++++ b/utils/config.go
+@@ -535,6 +535,8 @@ func GenerateClientConfig(c *model.Config, diagnosticId string, license *model.L
+ 	props["PasswordRequireNumber"] = strconv.FormatBool(*c.PasswordSettings.Number)
+ 	props["PasswordRequireSymbol"] = strconv.FormatBool(*c.PasswordSettings.Symbol)
+ 	props["CustomUrlSchemes"] = strings.Join(c.DisplaySettings.CustomUrlSchemes, ",")
++    props["ExperimentalClientSideCertEnable"] = strconv.FormatBool(*c.ExperimentalSettings.ClientSideCertEnable)
++    props["ExperimentalClientSideCertCheck"] = *c.ExperimentalSettings.ClientSideCertCheck
+ 
+ 	if license != nil {
+ 		props["ExperimentalHideTownSquareinLHS"] = strconv.FormatBool(*c.TeamSettings.ExperimentalHideTownSquareinLHS)
+@@ -559,8 +561,6 @@ func GenerateClientConfig(c *model.Config, diagnosticId string, license *model.L
+ 			props["SamlNicknameAttributeSet"] = strconv.FormatBool(*c.SamlSettings.NicknameAttribute != "")
+ 
+ 			// do this under the correct licensed feature
+-			props["ExperimentalClientSideCertEnable"] = strconv.FormatBool(*c.ExperimentalSettings.ClientSideCertEnable)
+-			props["ExperimentalClientSideCertCheck"] = *c.ExperimentalSettings.ClientSideCertCheck
+ 		}
+ 
+ 		if *license.Features.Cluster {
+-- 
+2.19.1
+

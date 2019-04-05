@@ -9,7 +9,16 @@ in
 
   options = with types; {
     common.resources = mkOption {
-      default = {};
+      default = {
+        output.wg_key_office.script = ''
+          wg genkey | tr -d '\n' | tee $out/privatekey | wg pubkey | tr -d '\n' > $out/publickey
+          jq '{pub:$pub,priv:$priv}' --null-input --rawfile pub $out/publickey --rawfile priv $out/privatekey
+        '';
+        output.wg_key_ace.script = ''
+          wg genkey | tr -d '\n' | tee $out/privatekey | wg pubkey | tr -d '\n' > $out/publickey
+          jq '{pub:$pub,priv:$priv}' --null-input --rawfile pub $out/publickey --rawfile priv $out/privatekey
+        '';
+      };
       description = "NixOps resource options. See nixops manual for further info";
       example = {};
       type = nullOr attrs;
@@ -18,7 +27,7 @@ in
       default = null;
       description = "Email contact for various things like Let's Encrypt";
       example = "dev@example.com";
-      type = str;
+      type = nullOr str;
     };
     common.instances = mkOption {
       default = {};
@@ -77,7 +86,7 @@ in
             example = {
               headless = true;
               vcpu = 2;
-              memorySixe = 1024;
+              memorySize = 1024;
             };
             type = nullOr attrs;
           };
@@ -87,7 +96,7 @@ in
             example = {
               headless = true;
               vcpu = 2;
-              memorySixe = 1024;
+              memorySize = 2048;
             };
             type = nullOr attrs;
           };
@@ -99,7 +108,8 @@ in
     routable_ip = n:
       let  res = builtins.tryEval n.config.networking.publicIPv4;
            res2 = builtins.tryEval n.config.networking.privateIPv4;
-      in if res.success && res.value != null then res.value else res2.value;
+      in if res.success && res.value != null then res.value else
+         if res2.success && res2.value != null then res2.value else "240.0.0.1";
     in
     {
     system.nixos.label = 
@@ -139,6 +149,13 @@ in
       "proc-sys-fs-binfmt_misc.automount"
       "proc-sys-fs-binfmt_misc.mount"
     ];
+
+    security.pam.loginLimits = [{
+      domain = "*";
+      type = "hard";
+      item = "nofile";
+      value = "1048576";
+    }];
     
   };
 }
