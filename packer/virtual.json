@@ -1,0 +1,23 @@
+{
+    "builders": [
+        {
+            "type": "virtualbox-ovf",
+            "guest_additions_mode": "disable",
+            "source_path": "https://releases.nixos.org/nixos/18.09/nixos-18.09.2394.2d656a97297/nixos-minimal-18.09.2394.2d656a97297-x86_64-linux.iso",
+            "ssh_username": "demo",
+            "ssh_password": "demo",
+            "shutdown_command": "echo 'packer' | sudo -S shutdown -P now",
+            "vboxmanage": [
+                ["modifyvm", "{{.Name}}", "--memory", "1024"],
+                ["modifyvm", "{{.Name}}", "--cpus", "2"]
+              ]
+        }
+    ],
+    "provisioners": [
+    {
+      "type": "shell",
+      "execute_command": "sudo sh '{{.Path}}'",
+      "script": "./postinstall.sh"
+    }
+  ]
+}

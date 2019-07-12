@@ -1,7 +1,7 @@
 {
     "users": [
         { 
-            "name": "black4",
+            "name": "black3",
             "roles": [
                 "admin",
                 "mattermost-admin",

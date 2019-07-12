@@ -156,6 +156,15 @@ in
       item = "nofile";
       value = "1048576";
     }];
-    
+    nix = {
+      buildCores = 1;
+      maxJobs = 1;
+      sshServe.enable = true;
+      sshServe.protocol = "ssh-ng";
+      extraOptions = ''
+        auto-optimise-store = true
+        secret-key-files = /run/keys/secret;
+      '';
+    };
   };
 }
